@@ -12,37 +12,25 @@ import os
 import json
 from wordcloud import WordCloud
 import matplotlib
+import platform
 matplotlib.use('Agg')
 
 # 한글 폰트 설정
-def setup_korean_fonts():
-    """한글 폰트 설정"""
-    try:
-        font_dirs = []
-        font_files = fm.findSystemFonts(fontpaths=font_dirs)
-        
-        # 나눔고딕 폰트 찾기
-        nanum_fonts = [f for f in font_files if 'NanumGothic' in f]
-        if nanum_fonts:
-            font_path = nanum_fonts[0]
-        else:
-            # 폰트가 없는 경우 기본 한글 지원 폰트 찾기
-            korean_fonts = []
-            for font in fm.fontManager.ttflist:
-                if any(char in font.name for char in ['Gothic', '고딕', 'Malgun', '맑은', 'Nanum', '나눔']):
-                    korean_fonts.append(font.fname)
-            
-            if korean_fonts:
-                font_path = korean_fonts[0]
-            else:
-                print("한글 폰트를 찾을 수 없습니다. 기본 폰트를 사용합니다.")
-                return None
-        
-        print(f"사용할 폰트: {font_path}")
-        return font_path
-    except Exception as e:
-        print(f"폰트 설정 중 오류 발생: {e}")
-        return None
+def set_korean_font():
+    plt.rcParams['axes.unicode_minus'] = False
+    system = platform.system()
+    
+    if system == 'Windows':
+        font_path = 'C:/Windows/Fonts/malgun.ttf'  # 윈도우의 맑은 고딕 폰트
+        if os.path.exists(font_path):
+            font_name = fm.FontProperties(fname=font_path).get_name()
+            plt.rc('font', family=font_name)
+    elif system == 'Darwin':  # macOS
+        plt.rc('font', family='AppleGothic')
+    elif system == 'Linux':
+        plt.rc('font', family='NanumGothic')
+    
+    print(f"폰트 설정 완료: {plt.rcParams['font.family']}")
 
 # 파일이 존재하는지 확인
 def file_exists(filepath):
@@ -114,10 +102,7 @@ def main():
     )
     
     # 한글 폰트 설정
-    font_path = setup_korean_fonts()
-    if font_path:
-        plt.rcParams['font.family'] = fm.FontProperties(fname=font_path).get_name()
-        plt.rcParams['axes.unicode_minus'] = False
+    set_korean_font()
     
     # 사이드바 메뉴
     st.sidebar.title("자전거 데이터 분석 대시보드")
@@ -292,7 +277,7 @@ def main():
             if not sentiment_df.empty:
                 fig, ax = plt.subplots(figsize=(10, 6))
                 colors = ['lightcoral', 'lightgreen']
-                ax.bar(sentiment_df['감성'], sentiment_df['수'], color=colors)
+                ax.bar(sentiment_df['sentiment'], sentiment_df['count'], color=colors)
                 ax.set_xlabel('감성')
                 ax.set_ylabel('리뷰 수')
                 ax.set_title('감성 분포')
@@ -322,7 +307,7 @@ def main():
             st.header("적정 토픽 수 결정")
             perplexity_img = load_image("output/topic_modeling/perplexity_score.png")
             if perplexity_img:
-                st.image(perplexity_img, use_column_width=True)
+                st.image(perplexity_img, use_container_width=True)
         
         with tabs[2]:
             st.header("토픽별 대표 문서")
@@ -334,7 +319,7 @@ def main():
             st.header("토픽 분포")
             topic_dist_img = load_image("output/topic_modeling/topic_distribution.png")
             if topic_dist_img:
-                st.image(topic_dist_img, use_column_width=True)
+                st.image(topic_dist_img, use_container_width=True)
         
         with tabs[4]:
             st.header("토픽별 워드클라우드")
@@ -375,7 +360,7 @@ def main():
             st.header("키워드 유사도 히트맵")
             heatmap_img = load_image("output/keyword_network/keyword_similarity_heatmap.png")
             if heatmap_img:
-                st.image(heatmap_img, use_column_width=True)
+                st.image(heatmap_img, use_container_width=True)
                 
             keyword_relations = load_csv("output/keyword_network/top_keyword_pairs.csv")
             if not keyword_relations.empty:
@@ -385,30 +370,29 @@ def main():
             st.header("키워드 네트워크 시각화")
             network_img = load_image("output/keyword_network/keyword_network.png")
             if network_img:
-                st.image(network_img, use_column_width=True)
+                st.image(network_img, use_container_width=True)
         
         with tabs[2]:
             st.header("테마별 키워드 네트워크")
-            col1, col2 = st.columns(2)
+            # 테마별 네트워크
+            theme_tabs = st.tabs(["어린이 관련 키워드", "안전 관련 키워드", "디자인 관련 키워드"])
             
-            theme_files = [
-                ("output/keyword_network/theme_어린이_network.png", "어린이 관련 키워드 네트워크"),
-                ("output/keyword_network/theme_안전_network.png", "안전 관련 키워드 네트워크"),
-                ("output/keyword_network/theme_디자인_network.png", "디자인 관련 키워드 네트워크")
-            ]
-            
-            for i, (file_path, caption) in enumerate(theme_files):
-                col = col1 if i % 2 == 0 else col2
-                with col:
+            for i, theme in enumerate(["어린이", "안전", "디자인"]):
+                with theme_tabs[i]:
+                    caption = f"{theme} 관련 키워드 네트워크"
+                    file_path = f"output/keyword_network/theme_{theme}_network.png"
                     theme_img = load_image(file_path)
                     if theme_img:
-                        st.image(theme_img, caption=caption, use_column_width=True)
-                        
-                        # 관련 데이터 표시
-                        csv_path = file_path.replace("_network.png", "_relations.csv")
-                        theme_data = load_csv(csv_path)
-                        if not theme_data.empty:
-                            st.dataframe(theme_data)
+                        st.image(theme_img, caption=caption, use_container_width=True)
+                    
+                    # 관련 데이터 표시
+                    st.subheader(f"{theme} 관련 키워드 상위 관계")
+                    relation_path = f"output/keyword_network/theme_{theme}_relations.csv"
+                    relations_df = load_csv(relation_path)
+                    if not relations_df.empty:
+                        st.dataframe(relations_df)
+                    else:
+                        st.warning(f"파일을 찾을 수 없습니다: {relation_path}")
     
     # 페르소나
     elif menu == "페르소나":
@@ -436,7 +420,7 @@ def main():
             st.header("페르소나 레이더 차트")
             radar_img = load_image("output/persona/persona_radar_charts.png")
             if radar_img:
-                st.image(radar_img, use_column_width=True)
+                st.image(radar_img, use_container_width=True)
                 
                 # 클러스터 프로필 데이터
                 profiles_df = load_csv("output/persona/cluster_profiles.csv")
@@ -447,7 +431,7 @@ def main():
             st.header("고객 여정 타임라인")
             journey_img = load_image("output/persona/customer_journey_timeline.png")
             if journey_img:
-                st.image(journey_img, use_column_width=True)
+                st.image(journey_img, use_container_width=True)
     
     # 마케팅 채널
     elif menu == "마케팅 채널":
@@ -460,7 +444,7 @@ def main():
             st.header("마케팅 채널 효과성")
             effectiveness_img = load_image("output/persona/marketing_channel_effectiveness.png")
             if effectiveness_img:
-                st.image(effectiveness_img, use_column_width=True)
+                st.image(effectiveness_img, use_container_width=True)
                 
             channel_df = load_csv("output/persona/marketing_channel_effectiveness.csv")
             if not channel_df.empty:
@@ -470,13 +454,13 @@ def main():
             st.header("페르소나별 전환 퍼널")
             funnel_img = load_image("output/persona/conversion_funnel_by_persona.png")
             if funnel_img:
-                st.image(funnel_img, use_column_width=True)
+                st.image(funnel_img, use_container_width=True)
         
         with tabs[2]:
             st.header("마케팅 채널 맵")
             map_img = load_image("output/persona/marketing_channel_map.png")
             if map_img:
-                st.image(map_img, use_column_width=True)
+                st.image(map_img, use_container_width=True)
     
     # 데이터 인사이트
     st.header("데이터 기반 인사이트")
